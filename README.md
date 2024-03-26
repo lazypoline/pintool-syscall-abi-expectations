@@ -23,10 +23,10 @@ To run our Pin tool, execute the following:
 $PIN_ROOT/pin -t /path/tosyscall_register_clobbering/obj-intel64/syscallregdeps.so -- <program name>
 ```
 
-## Expected Output
+## Output
 
 The analysis output will be written to the `pinout` directory.
-You should find a `pinatrace_<coreutil>.out` file for each evaluated program.
+Each evaluated program has a corresponding `pinatrace_<coreutil>.out` file.
 
 ### Pinatrace Output
 
@@ -35,21 +35,13 @@ For example:
 
     1 affected syscalls out of 185 syscalls
 
-You should find the results summarized in Table III under "Ubuntu 20.04" in the paper.
-
-Below you can see which read of a register is affected along with the affecting syscall. You should find that the affected register is `xmm0` as shown in Listing 1.
-
 ### Log Output
 
 For more information, there is a corresponding `log_<coreutil>.out` file for each affected binary, showing an instruction trace of each affected read in the binary.
 
-If you look at the 4 generated log files, you will find that all 4 issues are the same and correspond with Listing 1, as described in the subsection *Microbenchmarks* of the Evaluation Section:
+For example, the relevant instructions that are generated when evaluating the coreutil cp are shown below with some annotations:
 
-    "In Ubuntu 20.04, 40% of the evaluated coreutils are affected by the same pthread initialization issue, 
-    which we described in Listing 1."
-
-For example, the relevant instructions in log_cp.out, also present in Listing 1, are shown below:
-
+    ...
     0x7f587e811dce:    movq xmm0, r8
     0x7f587e811dd3:    push rbx
     0x7f092d499dd4:    punpcklqdq xmm0, xmm0                    <--- Last write to xmm0
@@ -68,30 +60,19 @@ For example, the relevant instructions in log_cp.out, also present in Listing 1,
     ...
     0x7f092d499e7e:    movups xmmword ptr [rdx+0x2c0], xmm0     <--- Transgressing read from xmm0
 
-### Origin Transgressing Instructions
+### Verify Transgressing Instructions
 
-To find where which library these instructions come from, you can attach gdb to the Pintool if you follow the instructions found here:
+To find which library/source code the transgressing instructions originate from, you can attach gdb to the Pintool, the instructions to do so are found here: https://software.intel.com/sites/landingpage/pintool/docs/98579/Pin/doc/html/index.html#APPDEBUG_UNIX. The Pintool will recognize it when a gdb instance is attached to it and will insert a breakpoint at every transgressing systemcall.
 
-https://software.intel.com/sites/landingpage/pintool/docs/98579/Pin/doc/html/index.html#APPDEBUG_UNIX
-
-However, it is simpler to simply run ldd and go through the linked system libraries, objdumping them one by one, to find the corresponding code.
+However, if the program uses few libraries it may be simpler to run ldd and go through the linked system libraries, objdumping them one by one, to find the corresponding code.
 
     ldd /bin/ls
 
-Dissassemble the system libraries with the following command
+You can dissassemble the system libraries with, for example, objdump:
 
-    objdump -M intel -d /usr/lib/x86_64-linux-gnu/<system_lib> > <system_lib>.asm
+    objdump -M intel -d /path/to/program <name>.asm
 
-Search the generated assembly files for the transgressing read instruction:
 
-    movups XMMWORD PTR [rdx+0x2c0],xmm0
+To verify whether the registers were truly supposed to be preserved, they must hale from the same function without a function call in between, as these registers are not expected to be preserved across function calls.
 
-This instruction belongs to `libpthread.so.0`. The instruction is part of the function `__pthread_initialize_minimal`. Like found in the paper in the Implementation Section in subsection *ABI Compatibility*: 
-    "Listing 1 presents a representative example, 
-    taken from the pthread initialization routine of glibc 2.31."
-
-To verify that the last read from and last write to xmm0 are part of the same function, meaning xmm0 is truly expected to be preserved, search for the last write to xmm0 (the instruction below). You will find that this instruction is also part of `__pthread_initialize_minimal`.
-
-    punpcklqdq xmm0,xmm0
-
-If you are curious, using bootlin you can find the source code of `__pthread_initialize_minimal`. 
+Another common false positive arises when registers are preserved, for example, before a function call, as often all xmm or ymm registers will be preserved even when not all registers were used.
