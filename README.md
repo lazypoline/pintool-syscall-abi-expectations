@@ -6,19 +6,27 @@ This Intel Pin tool tracks at run time whether any syscalls are executed between
 
 Intel Pin is a dynamic binary instrumentation (DBI) framework developed by Intel that enables creating custom analyses. More info at https://www.intel.com/content/www/us/en/developer/articles/tool/pin-a-dynamic-binary-instrumentation-tool.html. 
 
+## Building
+
+Make sure intel pin is downloaded somewhere. You can get the latest release here: https://www.intel.com/content/www/us/en/developer/articles/tool/pin-a-dynamic-binary-instrumentation-tool.html
+
+Then run `make` from the project root and specify the location of your PIN installation. Example:
+```bash
+make PIN_ROOT=/home/you/intelpin/pin-3.28-98749-g6643ecee5-gcc-linux/
+```
+
 ## Run Pintool
 
-To build and run our Pin tool, execute the following: 
+To run our Pin tool, execute the following: 
 
-    cd /root/syscall_register_clobbering
-    ./evaluate.sh
-
-> Note that our Pin tool does not require root privileges to run unprivileged binaries. However, we did not set up a user in each container for this eval. 
+```bash
+$PIN_ROOT/pin -t /path/tosyscall_register_clobbering/obj-intel64/syscallregdeps.so -- <program name>
+```
 
 ## Expected Output
 
 The analysis output will be written to the `pinout` directory.
-You should find a `pinatrace_<coreutil>.out` file per evaluated coreutil.
+You should find a `pinatrace_<coreutil>.out` file for each evaluated program.
 
 ### Pinatrace Output
 
@@ -27,20 +35,20 @@ For example:
 
     1 affected syscalls out of 185 syscalls
 
-You should find the results summaized in Table III under "Ubuntu 20.04".
+You should find the results summarized in Table III under "Ubuntu 20.04" in the paper.
 
 Below you can see which read of a register is affected along with the affecting syscall. You should find that the affected register is `xmm0` as shown in Listing 1.
 
 ### Log Output
 
-For more information, there is a corresponding `log_<coreutil>.out` file for each afffected binary, showing an instruction trace of each affected read in the binary.
+For more information, there is a corresponding `log_<coreutil>.out` file for each affected binary, showing an instruction trace of each affected read in the binary.
 
 If you look at the 4 generated log files, you will find that all 4 issues are the same and correspond with Listing 1, as described in the subsection *Microbenchmarks* of the Evaluation Section:
 
     "In Ubuntu 20.04, 40% of the evaluated coreutils are affected by the same pthread initialization issue, 
     which we described in Listing 1."
 
-For example, the relevant instrunctions in log_cp.out, also present in Listing 1, are shown below:
+For example, the relevant instructions in log_cp.out, also present in Listing 1, are shown below:
 
     0x7f587e811dce:    movq xmm0, r8
     0x7f587e811dd3:    push rbx
@@ -82,7 +90,7 @@ This instruction belongs to `libpthread.so.0`. The instruction is part of the fu
     "Listing 1 presents a representative example, 
     taken from the pthread initialization routine of glibc 2.31."
 
-To verify that the last read from and last write to xmm0 are part of the same function, meaning xmm0 is truly expected to be perserved, search for the last write to xmm0 (the instruction below). You will find that this instruction is also part of `__pthread_initialize_minimal`.
+To verify that the last read from and last write to xmm0 are part of the same function, meaning xmm0 is truly expected to be preserved, search for the last write to xmm0 (the instruction below). You will find that this instruction is also part of `__pthread_initialize_minimal`.
 
     punpcklqdq xmm0,xmm0
 
