@@ -72,7 +72,7 @@ You can dissassemble the system libraries with, for example, objdump:
 
     objdump -M intel -d /path/to/program <name>.asm
 
-
-To verify whether the registers were truly supposed to be preserved, they must hale from the same function without a function call in between, as these registers are not expected to be preserved across function calls.
-
-Another common false positive arises when registers are preserved, for example, before a function call, as often all xmm or ymm registers will be preserved even when not all registers were used.
+Once you know the context of where the flagged instructions are called, you can screen for false positives.
+For example: 
+- To verify a vector register was truly supposed to be preserved, the read and write instructions must hail from the same function without a function call in between, as these registers are not expected to be preserved across function calls.
+- A common false positive arises when registers are preserved (read from and written to memory), for example, before a function call. Often all xmm or ymm registers will be preserved even when not all registers were used, which means the last write to some of these registers could have been a long time ago and irrelevant.
